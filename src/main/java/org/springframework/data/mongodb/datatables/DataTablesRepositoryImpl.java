@@ -1,7 +1,9 @@
 package org.springframework.data.mongodb.datatables;
 
+import org.bson.Document;
 import org.springframework.data.mongodb.core.MongoOperations;
 import org.springframework.data.mongodb.core.MongoTemplate;
+import org.springframework.data.mongodb.core.aggregation.AggregationResults;
 import org.springframework.data.mongodb.core.query.Criteria;
 import org.springframework.data.mongodb.core.query.Query;
 import org.springframework.data.mongodb.repository.query.MongoEntityInformation;
@@ -61,21 +63,51 @@ final class DataTablesRepositoryImpl<T, ID extends Serializable> extends SimpleM
         }
 
         try {
-            long recordsTotal = count(preFilteringCriteria);
-            output.setRecordsTotal(recordsTotal);
-            if (recordsTotal == 0) {
-                return output;
-            }
+            if (input.getColumns().stream().anyMatch(c -> c.isReference())) {
+                if (containsReferenceColumn(input, preFilteringCriteria) || containsReferenceColumn(input, additionalCriteria)) {
+                    throw new IllegalArgumentException("Additional criteria and prefilter criteria cannot use a reference column.");
+                }
 
-            Query query = new DataTablesCriteria(input, additionalCriteria, preFilteringCriteria).toQuery();
-            long recordsFiltered = mongoOperations.count(query, metadata.getCollectionName());
-            output.setRecordsFiltered(recordsFiltered);
-            if (recordsFiltered == 0) {
-                return output;
-            }
+                long recordsTotal = count(preFilteringCriteria);
+                output.setRecordsTotal(recordsTotal);
+                if (recordsTotal == 0) {
+                    return output;
+                }
 
-            List<T> data = mongoOperations.find(query, metadata.getJavaType(), metadata.getCollectionName());
-            output.setData(converter == null ? (List<R>) data : data.stream().map(converter).collect(toList()));
+                DataTablesRefCriteria refCriteria = new DataTablesRefCriteria(input, additionalCriteria, preFilteringCriteria, metadata.getJavaType());
+
+                AggregationResults<Document> result = mongoOperations.aggregate(refCriteria.toFilteredCountAggregation(), metadata.getCollectionName(), Document.class);
+
+                int recordsFiltered = 0;
+
+                if (result.getUniqueMappedResult() != null) {
+                    recordsFiltered = (Integer) result.getUniqueMappedResult().get("filtered_count");
+                }
+                output.setRecordsFiltered(recordsFiltered);
+                if (recordsFiltered == 0) {
+                    return output;
+                }
+
+                AggregationResults<T> data = mongoOperations.aggregate(refCriteria.toAggregation(), metadata.getCollectionName(), metadata.getJavaType());
+                output.setData(converter == null ? (List<R>) data.getMappedResults() : data.getMappedResults().stream().map(converter).collect(toList()));
+            } else {
+
+                long recordsTotal = count(preFilteringCriteria);
+                output.setRecordsTotal(recordsTotal);
+                if (recordsTotal == 0) {
+                    return output;
+                }
+
+                Query query = new DataTablesCriteria(input, additionalCriteria, preFilteringCriteria).toQuery();
+                long recordsFiltered = mongoOperations.count(query, metadata.getCollectionName());
+                output.setRecordsFiltered(recordsFiltered);
+                if (recordsFiltered == 0) {
+                    return output;
+                }
+
+                List<T> data = mongoOperations.find(query, metadata.getJavaType(), metadata.getCollectionName());
+                output.setData(converter == null ? (List<R>) data : data.stream().map(converter).collect(toList()));
+            }
 
         } catch (Exception e) {
             output.setError(e.toString());
@@ -92,4 +124,12 @@ final class DataTablesRepositoryImpl<T, ID extends Serializable> extends SimpleM
         }
     }
 
+    private boolean containsReferenceColumn(DataTablesInput input, Criteria criteria) {
+        if (criteria == null) {
+            return false;
+        }
+
+        return input.getColumns().stream()
+                .anyMatch(c -> c.isReference() && criteria.getCriteriaObject().containsKey(c.getData()));
+    }
 }

@@ -23,6 +23,7 @@ public class ProductRepositoryTest {
     @Before
     public void init() {
         productRepository.deleteAll();
+
         productRepository.save(Product.PRODUCT1);
         productRepository.save(Product.PRODUCT2);
         productRepository.save(Product.PRODUCT3);
@@ -222,5 +223,4 @@ public class ProductRepositoryTest {
         DataTablesOutput<Product> output = productRepository.findAll(input);
         assertThat(output.getData()).containsSequence(Product.PRODUCT1, Product.PRODUCT2, Product.PRODUCT3);
     }
-
 }

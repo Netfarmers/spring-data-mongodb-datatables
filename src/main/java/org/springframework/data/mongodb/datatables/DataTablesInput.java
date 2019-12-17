@@ -107,6 +107,14 @@ public class DataTablesInput {
          */
         private boolean orderable;
 
+        private boolean reference;
+
+        private String referenceCollection;
+
+        private List<String> referenceColumns;
+
+        private String referenceOrderColumn;
+
         /**
          * Search value to apply to this specific column.
          */

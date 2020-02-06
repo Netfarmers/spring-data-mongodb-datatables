@@ -1,4 +1,4 @@
-![](https://github.com/Netfarmers/spring-data-mongodb-datatables/workflows/Maven%20Build/badge.svg)
+[![](https://github.com/Netfarmers/spring-data-mongodb-datatables/workflows/Maven%20Build/badge.svg)]()
 [![Maven Central](https://maven-badges.herokuapp.com/maven-central/com.github.netfarmers/spring-data-mongodb-datatables/badge.svg)](https://maven-badges.herokuapp.com/maven-central/com.github.netfarmers/spring-data-mongodb-datatables)
 
 # spring-data-mongodb-datatables
@@ -49,9 +49,9 @@ public class UserRestController {
 
 ```xml
 <dependency>
-  <groupId>com.github.darrachequesne</groupId>
+  <groupId>com.github.netfarmers</groupId>
   <artifactId>spring-data-mongodb-datatables</artifactId>
-  <version>1.0.2</version>
+  <version>1.2.1</version>
 </dependency>
 ```
 

@@ -1,5 +1,4 @@
-[![Build Status](https://api.travis-ci.org/darrachequesne/spring-data-mongodb-datatables.svg?branch=master)](https://travis-ci.org/darrachequesne/spring-data-mongodb-datatables)
-[![Maven Central](https://maven-badges.herokuapp.com/maven-central/com.github.darrachequesne/spring-data-mongodb-datatables/badge.svg)](https://maven-badges.herokuapp.com/maven-central/com.github.darrachequesne/spring-data-mongodb-datatables)
+[![Maven Central](https://maven-badges.herokuapp.com/maven-central/com.github.netfarmers/spring-data-mongodb-datatables/badge.svg)](https://maven-badges.herokuapp.com/maven-central/com.github.netfarmers/spring-data-mongodb-datatables)
 
 # spring-data-mongodb-datatables
 

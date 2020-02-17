@@ -76,9 +76,9 @@ public class OrderRepositoryTest {
         userRefColumns.add("lastName");
 
         input.setColumns(asList(
-                createColumn("id", true, true),
+                createIntColumn("id", true, true),
                 createColumn("label", true, true),
-                createColumn("isEnabled", true, true),
+                createBooleanColumn("isEnabled", true, true),
                 createColumn("createdAt", true, true),
                 createColumn("characteristics.key", true, true),
                 createColumn("characteristics.value", true, true),
@@ -87,6 +87,18 @@ public class OrderRepositoryTest {
         ));
         input.setSearch(new DataTablesInput.Search("", false));
         return input;
+    }
+
+    private DataTablesInput.Column createBooleanColumn(String columnName, boolean orderable, boolean searchable) {
+        DataTablesInput.Column column = createColumn(columnName, orderable, searchable);
+        column.setSearchType(DataTablesInput.Column.SearchType.Boolean);
+        return column;
+    }
+
+    private DataTablesInput.Column createIntColumn(String columnName, boolean orderable, boolean searchable) {
+        DataTablesInput.Column column = createColumn(columnName, orderable, searchable);
+        column.setSearchType(DataTablesInput.Column.SearchType.Integer);
+        return column;
     }
 
     private DataTablesInput.Column createColumn(String columnName, boolean orderable, boolean searchable) {
@@ -197,6 +209,16 @@ public class OrderRepositoryTest {
     }
 
     @Test
+    public void globalFilter_int() {
+        DataTablesInput input = getDefaultInput();
+        input.setSearch(new DataTablesInput.Search("1", false));
+
+        DataTablesOutput<Order> output = orderRepository.findAll(input);
+        assertThat(output.getData()).containsOnly(order1, order2);
+        assertThat(output.getError()).isNull();
+    }
+
+    @Test
     public void globalFilter_empty_result() {
         DataTablesInput input = getDefaultInput();
         input.setSearch(new DataTablesInput.Search(" axb  ", false));
@@ -227,17 +249,13 @@ public class OrderRepositoryTest {
         assertThat(output.getError()).isNull();
     }
 
-    /**
-     * Integer search is currently not supported in reference and in non-reference tables
-     */
     @Test
     public void columnFilter_int() {
         DataTablesInput input = getDefaultInput();
-        input.getColumn("id").ifPresent(column ->
-                column.setSearch(new DataTablesInput.Search("2", false)));
+        input.getColumn("id").ifPresent(column -> column.setSearch(new DataTablesInput.Search("2", false)));
 
         DataTablesOutput<Order> output = orderRepository.findAll(input);
-        assertThat(output.getData()).isEmpty();
+        assertThat(output.getData()).containsOnly(order2);
         assertThat(output.getError()).isNull();
     }
 
@@ -255,8 +273,7 @@ public class OrderRepositoryTest {
     @Test
     public void booleanAttribute() {
         DataTablesInput input = getDefaultInput();
-        input.getColumn("isEnabled").ifPresent(column ->
-                column.setSearch(new DataTablesInput.Search("true", false)));
+        input.getColumn("isEnabled").ifPresent(column -> column.setSearch(new DataTablesInput.Search("true", false)));
 
         DataTablesOutput<Order> output = orderRepository.findAll(input);
         assertThat(output.getData()).containsOnly(order1, order2);

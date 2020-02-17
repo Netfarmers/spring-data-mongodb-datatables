@@ -72,6 +72,10 @@ public class DataTablesInput {
     }
 
     public Optional<Column> getColumn(String columnName) {
+        if (columns.size() != columnMap.size()) {
+            this.columnMap = columns.stream().collect(toMap(Column::getData, x -> x));
+        }
+
         return ofNullable(columnMap.get(columnName));
     }
 
@@ -107,13 +111,30 @@ public class DataTablesInput {
          */
         private boolean orderable;
 
+        /**
+         * Flag to indicate if column should be resolved (true) or not (false).
+         */
         private boolean reference;
 
+        /**
+         * If 'reference' is true, this should be set to the exact collection name in the database which is used to resolve the reference.
+         */
         private String referenceCollection;
 
+        /**
+         * If 'reference' is true, this should include a list of names of all columns that should be searched
+         */
         private List<String> referenceColumns;
 
+        /**
+         * If 'reference' is true, this should be set to the name of the reference column which should be used to order the table.
+         */
         private String referenceOrderColumn;
+
+        /**
+         * Sets how the column should be searched. E.g., if values should be parsed to integer and compared as integer. Set it to SearchType.Integer.
+         */
+        private SearchType searchType = SearchType.String;
 
         /**
          * Search value to apply to this specific column.
@@ -121,6 +142,11 @@ public class DataTablesInput {
         @NotNull
         private Search search;
 
+        public enum SearchType {
+            String,
+            Boolean,
+            Integer
+        }
     }
 
     @Data

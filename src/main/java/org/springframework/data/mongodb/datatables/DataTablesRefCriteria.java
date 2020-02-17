@@ -165,16 +165,14 @@ final class DataTablesRefCriteria<T> {
     private List<Criteria> createCriteria(DataTablesInput.Column column, DataTablesInput.Search search) {
 
         String searchValue = search.getValue();
-        boolean isBooleanSearch = "true".equalsIgnoreCase(searchValue) || "false".equalsIgnoreCase(searchValue);
-
 
         if (column.isReference()) {
-
-            if (isBooleanSearch) {
-                boolean booleanSearchValue = Boolean.parseBoolean(searchValue);
+            // In case of reference, no searchType is available -> autoconvert true/false, else do string comparison
+            if ("true".equalsIgnoreCase(searchValue) || "false".equalsIgnoreCase(searchValue)) {
+                boolean boolSearchValue = Boolean.parseBoolean(searchValue);
 
                 return column.getReferenceColumns().stream()
-                        .map(data -> where(resolvedColumn.get(column.getData()) + "." + data).is(booleanSearchValue))
+                        .map(data -> where(resolvedColumn.get(column.getData()) + "." + data).is(boolSearchValue))
                         .collect(toList());
             } else {
                 return column.getReferenceColumns().stream()
@@ -182,17 +180,30 @@ final class DataTablesRefCriteria<T> {
                                 where(resolvedColumn.get(column.getData()) + "." + data).regex(searchValue) : where(resolvedColumn.get(column.getData()) + "." + data).regex(searchValue.trim(), "i"))
                         .collect(toList());
             }
-        } else if (isBooleanSearch) {
-            Criteria c = where(column.getData()).is(Boolean.valueOf(searchValue));
-            List<Criteria> criteria = new ArrayList<>();
-            criteria.add(c);
-            return criteria;
         } else {
             List<Criteria> criteria = new ArrayList<>();
-            if (search.isRegex()) {
-                criteria.add(where(column.getData()).regex(searchValue));
-            } else {
-                criteria.add(where(column.getData()).regex(searchValue.trim(), "i"));
+
+            switch (column.getSearchType()) {
+                case Boolean:
+                    if ("true".equalsIgnoreCase(searchValue) || "false".equalsIgnoreCase(searchValue)) {
+                        criteria.add(where(column.getData()).is(Boolean.parseBoolean(searchValue)));
+                    }
+                    break;
+                case Integer:
+                    try {
+                        int intSearchValue = Integer.parseInt(searchValue.trim());
+                        criteria.add(where(column.getData()).is(intSearchValue));
+                    } catch (NumberFormatException e) {
+                        return criteria;
+                    }
+                    break;
+                default:
+                    if (search.isRegex()) {
+                        criteria.add(where(column.getData()).regex(searchValue));
+                    } else {
+                        criteria.add(where(column.getData()).regex(searchValue.trim(), "i"));
+                    }
+                    break;
             }
 
             return criteria;

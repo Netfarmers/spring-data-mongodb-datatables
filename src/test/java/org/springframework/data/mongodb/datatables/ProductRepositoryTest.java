@@ -32,9 +32,9 @@ public class ProductRepositoryTest {
     private DataTablesInput getDefaultInput() {
         DataTablesInput input = new DataTablesInput();
         input.setColumns(asList(
-                createColumn("id", true, true),
+                createIntColumn("id", true, true),
                 createColumn("label", true, true),
-                createColumn("isEnabled", true, true),
+                createBooleanColumn("isEnabled", true, true),
                 createColumn("createdAt", true, true),
                 createColumn("characteristics.key", true, true),
                 createColumn("characteristics.value", true, true),
@@ -42,6 +42,18 @@ public class ProductRepositoryTest {
         ));
         input.setSearch(new DataTablesInput.Search("", false));
         return input;
+    }
+
+    private DataTablesInput.Column createBooleanColumn(String columnName, boolean orderable, boolean searchable) {
+        DataTablesInput.Column column = createColumn(columnName, orderable, searchable);
+        column.setSearchType(DataTablesInput.Column.SearchType.Boolean);
+        return column;
+    }
+
+    private DataTablesInput.Column createIntColumn(String columnName, boolean orderable, boolean searchable) {
+        DataTablesInput.Column column = createColumn(columnName, orderable, searchable);
+        column.setSearchType(DataTablesInput.Column.SearchType.Integer);
+        return column;
     }
 
     private DataTablesInput.Column createColumn(String columnName, boolean orderable, boolean searchable) {
@@ -122,6 +134,16 @@ public class ProductRepositoryTest {
 
         DataTablesOutput<Product> output = productRepository.findAll(input);
         assertThat(output.getData()).containsOnly(Product.PRODUCT3);
+    }
+
+    @Test
+    public void columnFilterInt() {
+        DataTablesInput input = getDefaultInput();
+        input.getColumn("id").ifPresent(column -> column.setSearch(new DataTablesInput.Search("2", false)));
+
+        DataTablesOutput<Product> output = productRepository.findAll(input);
+        assertThat(output.getData()).containsOnly(Product.PRODUCT2);
+        assertThat(output.getError()).isNull();
     }
 
     @Test

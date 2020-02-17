@@ -250,7 +250,7 @@ public class OrderRepositoryTest {
     }
 
     @Test
-    public void columnFilter_int() {
+    public void columnFilterInt() {
         DataTablesInput input = getDefaultInput();
         input.getColumn("id").ifPresent(column -> column.setSearch(new DataTablesInput.Search("2", false)));
 

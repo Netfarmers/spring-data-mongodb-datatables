@@ -1,5 +1,6 @@
 package org.springframework.data.mongodb.datatables;
 
+import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.openjdk.jmh.annotations.*;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -19,7 +20,7 @@ import static org.springframework.data.mongodb.core.query.Criteria.where;
 @ContextConfiguration(classes = TestConfiguration.class)
 @State(Scope.Benchmark)
 @BenchmarkMode(Mode.AverageTime)
-@OutputTimeUnit(TimeUnit.MICROSECONDS)
+@OutputTimeUnit(TimeUnit.MILLISECONDS)
 public class Benchmarks extends BenchmarkRunner {
 
     @Autowired
@@ -72,10 +73,30 @@ public class Benchmarks extends BenchmarkRunner {
         assertThat(output.getData().size()).isEqualTo(6);
     }
 
+    @Benchmark
+    public void columnFilter() {
+        DataTablesInput input = getDefaultInput();
+        input.getColumn("label").ifPresent(column ->
+                column.setSearch(new DataTablesInput.Search(" ORDer 2  ", false)));
+
+        DataTablesOutput<Order> output = orderRepository.findAll(input);
+        assertThat(output.getData().size()).isEqualTo(10);
+    }
+
+    @Benchmark
+    public void columnFilterInt() {
+        DataTablesInput input = getDefaultInput();
+        input.getColumn("id").ifPresent(column -> column.setSearch(new DataTablesInput.Search("2", false)));
+
+        DataTablesOutput<Order> output = orderRepository.findAll(input);
+        assertThat(output.getData().size()).isEqualTo(1);
+        assertThat(output.getError()).isNull();
+    }
+
     private DataTablesInput getDefaultInput() {
         DataTablesInput input = new DataTablesInput();
         input.setColumns(asList(
-                createColumn("id", true, true),
+                createIntColumn("id", true, true),
                 createColumn("label", true, true),
                 createColumn("isEnabled", true, true),
                 createColumn("createdAt", true, true),
@@ -95,9 +116,9 @@ public class Benchmarks extends BenchmarkRunner {
         productRefColumns.add("isEnabled");
 
         input.setColumns(asList(
-                createColumn("id", true, true),
+                createIntColumn("id", true, true),
                 createColumn("label", true, true),
-                createColumn("isEnabled", true, true),
+                createBooleanColumn("isEnabled", true, true),
                 createColumn("createdAt", true, true),
                 createColumn("characteristics.key", true, true),
                 createColumn("characteristics.value", true, true),
@@ -125,6 +146,18 @@ public class Benchmarks extends BenchmarkRunner {
         column.setReferenceCollection(refCollection);
         column.setReferenceColumns(refColumns);
         column.setSearch(new DataTablesInput.Search("", true));
+        return column;
+    }
+
+    private DataTablesInput.Column createBooleanColumn(String columnName, boolean orderable, boolean searchable) {
+        DataTablesInput.Column column = createColumn(columnName, orderable, searchable);
+        column.setSearchType(DataTablesInput.Column.SearchType.Boolean);
+        return column;
+    }
+
+    private DataTablesInput.Column createIntColumn(String columnName, boolean orderable, boolean searchable) {
+        DataTablesInput.Column column = createColumn(columnName, orderable, searchable);
+        column.setSearchType(DataTablesInput.Column.SearchType.Integer);
         return column;
     }
 }

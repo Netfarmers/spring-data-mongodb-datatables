@@ -6,6 +6,7 @@ import org.openjdk.jmh.runner.Runner;
 import org.openjdk.jmh.runner.RunnerException;
 import org.openjdk.jmh.runner.options.Options;
 import org.openjdk.jmh.runner.options.OptionsBuilder;
+import org.openjdk.jmh.runner.options.TimeValue;
 
 import java.time.LocalDateTime;
 import java.util.ArrayList;
@@ -26,7 +27,9 @@ public abstract class BenchmarkRunner {
                 // set the class name regex for benchmarks to search for to the current class
                 .include("\\." + this.getClass().getSimpleName() + "\\.")
                 .warmupIterations(5)
+                .warmupTime(TimeValue.seconds(1))
                 .measurementIterations(10)
+                .measurementTime(TimeValue.seconds(2))
                 // do not use forking or the benchmark methods will not see references stored within its class
                 .forks(0)
                 // do not use multiple threads

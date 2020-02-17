@@ -5,7 +5,6 @@ import org.springframework.data.mongodb.core.MongoOperations;
 import org.springframework.data.mongodb.core.MongoTemplate;
 import org.springframework.data.mongodb.core.aggregation.AggregationResults;
 import org.springframework.data.mongodb.core.query.Criteria;
-import org.springframework.data.mongodb.core.query.Query;
 import org.springframework.data.mongodb.repository.query.MongoEntityInformation;
 import org.springframework.data.mongodb.repository.support.SimpleMongoRepository;
 
@@ -63,51 +62,32 @@ final class DataTablesRepositoryImpl<T, ID extends Serializable> extends SimpleM
         }
 
         try {
-            if (input.getColumns().stream().anyMatch(DataTablesInput.Column::isReference)) {
-                if (containsReferenceColumn(input, preFilteringCriteria) || containsReferenceColumn(input, additionalCriteria)) {
-                    throw new IllegalArgumentException("Additional criteria and prefilter criteria cannot use a reference column.");
-                }
-
-                long recordsTotal = count(preFilteringCriteria);
-                output.setRecordsTotal(recordsTotal);
-                if (recordsTotal == 0) {
-                    return output;
-                }
-
-                DataTablesRefCriteria refCriteria = new DataTablesRefCriteria(input, additionalCriteria, preFilteringCriteria, metadata.getJavaType());
-
-                AggregationResults<Document> result = mongoOperations.aggregate(refCriteria.toFilteredCountAggregation(), metadata.getCollectionName(), Document.class);
-
-                int recordsFiltered = 0;
-
-                if (result.getUniqueMappedResult() != null) {
-                    recordsFiltered = (Integer) result.getUniqueMappedResult().get("filtered_count");
-                }
-                output.setRecordsFiltered(recordsFiltered);
-                if (recordsFiltered == 0) {
-                    return output;
-                }
-
-                AggregationResults<T> data = mongoOperations.aggregate(refCriteria.toAggregation(), metadata.getCollectionName(), metadata.getJavaType());
-                output.setData(converter == null ? (List<R>) data.getMappedResults() : data.getMappedResults().stream().map(converter).collect(toList()));
-            } else {
-
-                long recordsTotal = count(preFilteringCriteria);
-                output.setRecordsTotal(recordsTotal);
-                if (recordsTotal == 0) {
-                    return output;
-                }
-
-                Query query = new DataTablesCriteria(input, additionalCriteria, preFilteringCriteria).toQuery();
-                long recordsFiltered = mongoOperations.count(query, metadata.getCollectionName());
-                output.setRecordsFiltered(recordsFiltered);
-                if (recordsFiltered == 0) {
-                    return output;
-                }
-
-                List<T> data = mongoOperations.find(query, metadata.getJavaType(), metadata.getCollectionName());
-                output.setData(converter == null ? (List<R>) data : data.stream().map(converter).collect(toList()));
+            if (containsReferenceColumn(input, preFilteringCriteria) || containsReferenceColumn(input, additionalCriteria)) {
+                throw new IllegalArgumentException("Additional criteria and prefilter criteria cannot use a reference column.");
             }
+
+            long recordsTotal = count(preFilteringCriteria);
+            output.setRecordsTotal(recordsTotal);
+            if (recordsTotal == 0) {
+                return output;
+            }
+
+            DataTablesCriteria refCriteria = new DataTablesCriteria(input, additionalCriteria, preFilteringCriteria, metadata.getJavaType());
+
+            AggregationResults<Document> result = mongoOperations.aggregate(refCriteria.toFilteredCountAggregation(), metadata.getCollectionName(), Document.class);
+
+            int recordsFiltered = 0;
+
+            if (result.getUniqueMappedResult() != null) {
+                recordsFiltered = (Integer) result.getUniqueMappedResult().get("filtered_count");
+            }
+            output.setRecordsFiltered(recordsFiltered);
+            if (recordsFiltered == 0) {
+                return output;
+            }
+
+            AggregationResults<T> data = mongoOperations.aggregate(refCriteria.toAggregation(), metadata.getCollectionName(), metadata.getJavaType());
+            output.setData(converter == null ? (List<R>) data.getMappedResults() : data.getMappedResults().stream().map(converter).collect(toList()));
 
         } catch (Exception e) {
             output.setError(e.toString());

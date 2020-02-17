@@ -51,7 +51,7 @@ public class UserRestController {
 <dependency>
   <groupId>com.github.netfarmers</groupId>
   <artifactId>spring-data-mongodb-datatables</artifactId>
-  <version>1.2.1</version>
+  <version>1.2.2</version>
 </dependency>
 ```
 

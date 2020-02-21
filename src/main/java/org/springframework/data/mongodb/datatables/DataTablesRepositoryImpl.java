@@ -105,7 +105,7 @@ final class DataTablesRepositoryImpl<T, ID extends Serializable> extends SimpleM
     }
 
     private boolean containsReferenceColumn(DataTablesInput input, Criteria criteria) {
-        if (criteria == null) {
+        if (criteria == null || input.getSearchConfiguration() == null) {
             return false;
         }
 

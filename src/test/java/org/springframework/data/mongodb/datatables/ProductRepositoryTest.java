@@ -52,6 +52,21 @@ public class ProductRepositoryTest {
         return input;
     }
 
+    private DataTablesInput getPureInput() {
+        DataTablesInput input = new DataTablesInput();
+        input.setColumns(new ArrayList<>(asList(
+                createColumn("id", true, true),
+                createColumn("label", true, true),
+                createColumn("isEnabled", true, true),
+                createColumn("createdAt", true, true),
+                createColumn("characteristics.key", true, true),
+                createColumn("characteristics.value", true, true),
+                createColumn("unknown", false, false)
+        )));
+        input.setSearch(new DataTablesInput.Search("", false));
+        return input;
+    }
+
     private DataTablesInput.Column createColumn(String columnName, boolean orderable, boolean searchable) {
         DataTablesInput.Column column = new DataTablesInput.Column();
         column.setData(columnName);
@@ -312,5 +327,24 @@ public class ProductRepositoryTest {
         });
 
         assertThat(output.getError()).isNull();
+    }
+
+    @Test
+    public void pureInput() {
+        DataTablesInput input = getPureInput();
+
+        DataTablesOutput<Product> output = productRepository.findAll(input);
+        assertThat(output.getError()).isNull();
+        assertThat(output.getData().size()).isEqualTo(3);
+    }
+
+    @Test
+    public void pureInput_AdditionalCriteria() {
+        DataTablesInput input = getPureInput();
+
+        Criteria criteria = where("label").in("product1", "product2");
+        DataTablesOutput<Product> output = productRepository.findAll(input, criteria);
+        assertThat(output.getError()).isNull();
+        assertThat(output.getData().size()).isEqualTo(2);
     }
 }

@@ -109,7 +109,8 @@ final class DataTablesRepositoryImpl<T, ID extends Serializable> extends SimpleM
             return false;
         }
 
-        return input.getColumns().stream()
-                .anyMatch(c -> c.isReference() && criteria.getCriteriaObject().containsKey(c.getData()));
+        return input.getSearchConfiguration().getColumnSearchConfiguration().entrySet()
+                .stream()
+                .anyMatch(c -> c.getValue().isReference() && criteria.getCriteriaObject().containsKey(c.getKey()));
     }
 }

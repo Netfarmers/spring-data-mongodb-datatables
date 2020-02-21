@@ -8,6 +8,8 @@ import org.springframework.data.mongodb.core.query.Criteria;
 import org.springframework.test.context.ContextConfiguration;
 import org.springframework.test.context.junit4.SpringJUnit4ClassRunner;
 
+import java.util.ArrayList;
+
 import static java.util.Arrays.asList;
 import static java.util.Collections.singletonList;
 import static org.assertj.core.api.Assertions.assertThat;
@@ -31,29 +33,23 @@ public class ProductRepositoryTest {
 
     private DataTablesInput getDefaultInput() {
         DataTablesInput input = new DataTablesInput();
-        input.setColumns(asList(
-                createIntColumn("id", true, true),
+        input.setColumns(new ArrayList<>(asList(
+                createColumn("id", true, true),
                 createColumn("label", true, true),
-                createBooleanColumn("isEnabled", true, true),
+                createColumn("isEnabled", true, true),
                 createColumn("createdAt", true, true),
                 createColumn("characteristics.key", true, true),
                 createColumn("characteristics.value", true, true),
                 createColumn("unknown", false, false)
-        ));
+        )));
         input.setSearch(new DataTablesInput.Search("", false));
+
+        DataTablesInput.SearchConfiguration searchConfiguration = new DataTablesInput.SearchConfiguration();
+        input.setSearchConfiguration(searchConfiguration);
+
+        searchConfiguration.setSearchType("id", DataTablesInput.SearchType.Integer);
+        searchConfiguration.setSearchType("isEnabled", DataTablesInput.SearchType.Boolean);
         return input;
-    }
-
-    private DataTablesInput.Column createBooleanColumn(String columnName, boolean orderable, boolean searchable) {
-        DataTablesInput.Column column = createColumn(columnName, orderable, searchable);
-        column.setSearchType(DataTablesInput.Column.SearchType.Boolean);
-        return column;
-    }
-
-    private DataTablesInput.Column createIntColumn(String columnName, boolean orderable, boolean searchable) {
-        DataTablesInput.Column column = createColumn(columnName, orderable, searchable);
-        column.setSearchType(DataTablesInput.Column.SearchType.Integer);
-        return column;
     }
 
     private DataTablesInput.Column createColumn(String columnName, boolean orderable, boolean searchable) {
@@ -244,5 +240,77 @@ public class ProductRepositoryTest {
 
         DataTablesOutput<Product> output = productRepository.findAll(input);
         assertThat(output.getData()).containsSequence(Product.PRODUCT1, Product.PRODUCT2, Product.PRODUCT3);
+    }
+
+    @Test
+    public void excludedColumn() {
+        DataTablesInput input = getDefaultInput();
+        input.setSearch(new DataTablesInput.Search(" PROduct2  ", false));
+
+        input.getSearchConfiguration().getExcludedColumns().add("createdAt");
+
+        DataTablesOutput<Product> output = productRepository.findAll(input);
+        assertThat(output.getData().size()).isEqualTo(1);
+        assertThat(output.getData().get(0).getId()).isEqualTo(2);
+        assertThat(output.getData().get(0).getCreatedAt()).isNull();
+        assertThat(output.getError()).isNull();
+    }
+
+    @Test
+    public void excludedColumn_id() {
+        DataTablesInput input = getDefaultInput();
+        input.setSearch(new DataTablesInput.Search("2", false));
+
+        input.getSearchConfiguration().getExcludedColumns().add("id");
+        input.getSearchConfiguration().getExcludedColumns().add("label");
+        input.getSearchConfiguration().getExcludedColumns().add("characteristics");
+        input.getSearchConfiguration().getExcludedColumns().add("characteristics.key");
+        input.getSearchConfiguration().getExcludedColumns().add("characteristics.value");
+        DataTablesOutput<Product> output = productRepository.findAll(input);
+        assertThat(output.getData().size()).isEqualTo(0);
+        assertThat(output.getError()).isNull();
+
+        input = getDefaultInput();
+        input.setSearch(new DataTablesInput.Search("2", false));
+
+        input.getSearchConfiguration().getExcludedColumns().add("label");
+        input.getSearchConfiguration().getExcludedColumns().add("characteristics");
+        input.getSearchConfiguration().getExcludedColumns().add("characteristics.key");
+        input.getSearchConfiguration().getExcludedColumns().add("characteristics.value");
+        output = productRepository.findAll(input);
+        assertThat(output.getData().size()).isEqualTo(1);
+        assertThat(output.getError()).isNull();
+    }
+
+    @Test
+    public void excludedColumn_array() {
+        DataTablesInput input = getDefaultInput();
+        input.setSearch(new DataTablesInput.Search("2", false));
+
+        input.getSearchConfiguration().getExcludedColumns().add("characteristics");
+        input.getSearchConfiguration().getExcludedColumns().add("characteristics.key");
+        input.getSearchConfiguration().getExcludedColumns().add("characteristics.value");
+        DataTablesOutput<Product> output = productRepository.findAll(input);
+        assertThat(output.getData().size()).isEqualTo(1);
+        assertThat(output.getData().get(0).getCharacteristics()).isNull();
+        assertThat(output.getError()).isNull();
+    }
+
+    @Test
+    public void excludedColumn_multiple() {
+        DataTablesInput input = getDefaultInput();
+
+        input.getSearchConfiguration().getExcludedColumns().add("label");
+        input.getSearchConfiguration().getExcludedColumns().add("createdAt");
+
+        DataTablesOutput<Product> output = productRepository.findAll(input);
+        assertThat(output.getData().size()).isEqualTo(3);
+
+        output.getData().forEach(order -> {
+            assertThat(order.getCreatedAt()).isNull();
+            assertThat(order.getLabel()).isNull();
+        });
+
+        assertThat(output.getError()).isNull();
     }
 }

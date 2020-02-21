@@ -7,9 +7,7 @@ import javax.validation.constraints.Min;
 import javax.validation.constraints.NotBlank;
 import javax.validation.constraints.NotEmpty;
 import javax.validation.constraints.NotNull;
-import java.util.List;
-import java.util.Map;
-import java.util.Optional;
+import java.util.*;
 
 import static java.util.Optional.ofNullable;
 import static java.util.stream.Collectors.toMap;
@@ -66,6 +64,9 @@ public class DataTablesInput {
     @JsonIgnore
     private Map<String, Column> columnMap;
 
+    @JsonIgnore
+    private SearchConfiguration searchConfiguration;
+
     public void setColumns(List<Column> columns) {
         this.columns = columns;
         this.columnMap = columns.stream().collect(toMap(Column::getData, x -> x));
@@ -112,41 +113,10 @@ public class DataTablesInput {
         private boolean orderable;
 
         /**
-         * Flag to indicate if column should be resolved (true) or not (false).
-         */
-        private boolean reference;
-
-        /**
-         * If 'reference' is true, this should be set to the exact collection name in the database which is used to resolve the reference.
-         */
-        private String referenceCollection;
-
-        /**
-         * If 'reference' is true, this should include a list of names of all columns that should be searched
-         */
-        private List<String> referenceColumns;
-
-        /**
-         * If 'reference' is true, this should be set to the name of the reference column which should be used to order the table.
-         */
-        private String referenceOrderColumn;
-
-        /**
-         * Sets how the column should be searched. E.g., if values should be parsed to integer and compared as integer. Set it to SearchType.Integer.
-         */
-        private SearchType searchType = SearchType.String;
-
-        /**
          * Search value to apply to this specific column.
          */
         @NotNull
         private Search search;
-
-        public enum SearchType {
-            String,
-            Boolean,
-            Integer
-        }
     }
 
     @Data
@@ -203,4 +173,75 @@ public class DataTablesInput {
         }
     }
 
+    @Data
+    public static class SearchConfiguration {
+
+        /**
+         * Exclude specific columns by name from being loaded and checked.
+         */
+        private List<String> excludedColumns = new ArrayList<>();
+
+        private Map<String, ColumnSearchConfiguration> columnSearchConfiguration = new HashMap<>();
+
+        public void addRefConfiguration(String data, String referenceCollection, List<String> referenceColumns, String referenceOrderColumn) {
+            ColumnSearchConfiguration searchConfiguration;
+            if (columnSearchConfiguration.containsKey(data)) {
+                searchConfiguration = columnSearchConfiguration.get(data);
+            } else {
+                searchConfiguration = new ColumnSearchConfiguration();
+                columnSearchConfiguration.put(data, searchConfiguration);
+            }
+
+            searchConfiguration.setReference(true);
+            searchConfiguration.setReferenceCollection(referenceCollection);
+            searchConfiguration.setReferenceColumns(referenceColumns);
+            searchConfiguration.setReferenceOrderColumn(referenceOrderColumn);
+        }
+
+        public void setSearchType(String data, SearchType searchType) {
+            if (columnSearchConfiguration.containsKey(data)) {
+                columnSearchConfiguration.get(data).setSearchType(searchType);
+            } else {
+                ColumnSearchConfiguration searchConfiguration = new ColumnSearchConfiguration();
+                searchConfiguration.setSearchType(searchType);
+                columnSearchConfiguration.put(data, searchConfiguration);
+            }
+        }
+
+        @Data
+        public static class ColumnSearchConfiguration {
+            public static ColumnSearchConfiguration DEFAULT = new ColumnSearchConfiguration();
+
+            /**
+             * Flag to indicate if column should be resolved (true) or not (false).
+             */
+            private boolean reference;
+
+            /**
+             * If 'reference' is true, this should be set to the exact collection name in the database which is used to resolve the reference.
+             */
+            private String referenceCollection;
+
+            /**
+             * If 'reference' is true, this should include a list of names of all columns that should be searched
+             */
+            private List<String> referenceColumns;
+
+            /**
+             * If 'reference' is true, this should be set to the name of the reference column which should be used to order the table.
+             */
+            private String referenceOrderColumn;
+
+            /**
+             * Sets how the column should be searched. E.g., if values should be parsed to integer and compared as integer. Set it to SearchType.Integer.
+             */
+            private SearchType searchType = SearchType.String;
+        }
+    }
+
+    public enum SearchType {
+        String,
+        Boolean,
+        Integer
+    }
 }

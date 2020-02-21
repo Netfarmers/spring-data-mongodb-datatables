@@ -26,17 +26,38 @@ final class DataTablesCriteria<T> {
     private Fields allClassFields;
     private String originalIdField;
 
-    DataTablesCriteria(DataTablesInput input, Criteria additionalCriteria, Criteria preFilteringCriteria, Class<T> classType) {
-        // fill column map
-        input.setColumns(input.getColumns());
+    private Map<String, DataTablesInput.SearchConfiguration.ColumnSearchConfiguration> columnSearchConfiguration;
+    private List<String> excludedColumns;
 
-        allClassFields = getFields(classType);
+    DataTablesCriteria(DataTablesInput input, Criteria additionalCriteria, Criteria preFilteringCriteria, Class<T> classType) {
+        if (input.getSearchConfiguration() != null) {
+            columnSearchConfiguration = input.getSearchConfiguration().getColumnSearchConfiguration();
+            excludedColumns = input.getSearchConfiguration().getExcludedColumns();
+        } else {
+            columnSearchConfiguration = new HashMap<>();
+            excludedColumns = new ArrayList<>();
+        }
+
+        allClassFields = getFields(classType, excludedColumns);
+
+        for (String excludedColumn : excludedColumns) {
+            input.getColumn(excludedColumn).ifPresent(column -> input.getColumns().remove(column));
+            input.getColumnMap().remove(excludedColumn);
+            columnSearchConfiguration.remove(excludedColumn);
+        }
+
         setDeclaredIdField(classType);
 
         if (!StringUtils.isEmpty(originalIdField)) {
             input.getColumn(originalIdField).ifPresent(c -> {
+
+                DataTablesInput.SearchConfiguration.ColumnSearchConfiguration searchConfig = columnSearchConfiguration.get(c.getData());
+                columnSearchConfiguration.remove(c.getData());
+
                 c.setData("_id");
                 input.setColumns(input.getColumns());
+
+                columnSearchConfiguration.put(c.getData(), searchConfig);
             });
         }
 
@@ -45,7 +66,18 @@ final class DataTablesCriteria<T> {
         if (additionalCriteria != null) aggregationOperations.add(Aggregation.match(additionalCriteria));
         if (preFilteringCriteria != null) aggregationOperations.add(Aggregation.match(preFilteringCriteria));
 
-        aggregationOperations.addAll(addReferenceResolver(input));
+        // If there is not projection because of references but there are excluded columns,
+        // an extra projection has to be added to exclude these columns
+        if (!columnSearchConfiguration.isEmpty()) {
+            List<AggregationOperation> referenceResolverOps = addReferenceResolver(input);
+            aggregationOperations.addAll(referenceResolverOps);
+
+            if (referenceResolverOps.isEmpty() && !excludedColumns.isEmpty()) {
+                aggregationOperations.add(createFieldProjection(input));
+            }
+        } else if (!excludedColumns.isEmpty()) {
+            aggregationOperations.add(createFieldProjection(input));
+        }
 
         AggregationOperation globalMatching = addGlobalCriteria(input);
 
@@ -86,7 +118,10 @@ final class DataTablesCriteria<T> {
                 .collect(toList());
 
         for (DataTablesInput.Column c: input.getColumns()) {
-            if (c.isReference() && (c.isSearchable() || c.isOrderable())) {
+
+            DataTablesInput.SearchConfiguration.ColumnSearchConfiguration searchConfig = columnSearchConfiguration.get(c.getData());
+
+            if (searchConfig != null && searchConfig.isReference() && (c.isSearchable() || c.isOrderable())) {
 
                 String resolvedReferenceColumn = getResolvedRefColumn(c, columnStrings);
 
@@ -116,7 +151,7 @@ final class DataTablesCriteria<T> {
 
                 // Lookup object with id in reference collection and save it in document
                 LookupOperation lookupOperation = Aggregation
-                        .lookup(c.getReferenceCollection(), resolvedReferenceColumn + "_id", "_id", resolvedReferenceColumn);
+                        .lookup(searchConfig.getReferenceCollection(), resolvedReferenceColumn + "_id", "_id", resolvedReferenceColumn);
 
                 // Make sure resolved object stays in future projections
                 columnStrings.add(resolvedReferenceColumn);
@@ -165,17 +200,21 @@ final class DataTablesCriteria<T> {
     private List<Criteria> createCriteria(DataTablesInput.Column column, DataTablesInput.Search search) {
 
         String searchValue = search.getValue();
+        DataTablesInput.SearchConfiguration.ColumnSearchConfiguration searchConfig = columnSearchConfiguration.get(column.getData());
+        if (searchConfig == null) {
+            searchConfig = DataTablesInput.SearchConfiguration.ColumnSearchConfiguration.DEFAULT;
+        }
 
-        if (column.isReference()) {
+        if (searchConfig.isReference()) {
             // In case of reference, no searchType is available -> autoconvert true/false, else do string comparison
             if ("true".equalsIgnoreCase(searchValue) || "false".equalsIgnoreCase(searchValue)) {
                 boolean boolSearchValue = Boolean.parseBoolean(searchValue);
 
-                return column.getReferenceColumns().stream()
+                return searchConfig.getReferenceColumns().stream()
                         .map(data -> where(resolvedColumn.get(column.getData()) + "." + data).is(boolSearchValue))
                         .collect(toList());
             } else {
-                return column.getReferenceColumns().stream()
+                return searchConfig.getReferenceColumns().stream()
                         .map(data -> search.isRegex() ?
                                 where(resolvedColumn.get(column.getData()) + "." + data).regex(searchValue) : where(resolvedColumn.get(column.getData()) + "." + data).regex(searchValue.trim(), "i"))
                         .collect(toList());
@@ -183,7 +222,7 @@ final class DataTablesCriteria<T> {
         } else {
             List<Criteria> criteria = new ArrayList<>();
 
-            switch (column.getSearchType()) {
+            switch (searchConfig.getSearchType()) {
                 case Boolean:
                     if ("true".equalsIgnoreCase(searchValue) || "false".equalsIgnoreCase(searchValue)) {
                         criteria.add(where(column.getData()).is(Boolean.parseBoolean(searchValue)));
@@ -214,7 +253,6 @@ final class DataTablesCriteria<T> {
         List<AggregationOperation> operations = new ArrayList<>();
 
         if (!isEmpty(input.getOrder())) {
-
             List<Sort.Order> orders = input.getOrder().stream()
                     .filter(order -> isOrderable(input, order))
                     .map(order -> toOrder(input, order)).collect(toList());
@@ -238,16 +276,25 @@ final class DataTablesCriteria<T> {
         boolean isWithinBounds = order.getColumn() < input.getColumns().size();
 
         DataTablesInput.Column column = input.getColumns().get(order.getColumn());
-        return isWithinBounds && column.isOrderable()
-                && (!column.isReference() || !StringUtils.isEmpty(column.getReferenceOrderColumn()));
+
+        if (columnSearchConfiguration.containsKey(column.getData())) {
+            DataTablesInput.SearchConfiguration.ColumnSearchConfiguration searchConfig = columnSearchConfiguration.get(column.getData());
+            return isWithinBounds && column.isOrderable()
+                    && (!searchConfig.isReference() || !StringUtils.isEmpty(searchConfig.getReferenceOrderColumn()));
+        } else {
+            return isWithinBounds && column.isOrderable();
+        }
     }
 
     private Sort.Order toOrder(DataTablesInput input, DataTablesInput.Order order) {
         DataTablesInput.Column column = input.getColumns().get(order.getColumn());
         Sort.Direction sortDir = order.getDir() == DataTablesInput.Order.Direction.asc ? Sort.Direction.ASC : Sort.Direction.DESC;
 
-        if (column.isReference()) {
-            return new Sort.Order(sortDir, resolvedColumn.get(column.getData()) + "." + column.getReferenceOrderColumn());
+        if (columnSearchConfiguration.containsKey(column.getData())) {
+            DataTablesInput.SearchConfiguration.ColumnSearchConfiguration searchConfig = columnSearchConfiguration.get(column.getData());
+            if (searchConfig.isReference()) {
+                return new Sort.Order(sortDir, resolvedColumn.get(column.getData()) + "." + searchConfig.getReferenceOrderColumn());
+            }
         }
 
         return new Sort.Order(sortDir, column.getData());
@@ -275,12 +322,21 @@ final class DataTablesCriteria<T> {
         return filteredCountAggregation;
     }
 
+    private AggregationOperation createFieldProjection(DataTablesInput input) {
+        List<String> columnStrings = input.getColumns().stream()
+                .map(column -> column.getData().contains(".") ? column.getData().substring(0, column.getData().indexOf(".")) : column.getData())
+                .distinct()
+                .collect(toList());
+
+        return Aggregation.project(allClassFields).andInclude(columnStrings.toArray(new String[0]));
+    }
+
     /**
      * Use official getFields method to list all fields of the class.
      * Source: https://github.com/spring-projects/spring-data-mongodb/blob/1a5de2e1db939f7b35579f11815894fd637fc227/spring-data-mongodb/src/main/java/org/springframework/data/mongodb/core/aggregation/AggregationOperationContext.java#L88
      * @return Class fields
      */
-    private Fields getFields(Class<T> type) {
+    private Fields getFields(Class<T> type, List<String> excludedColumns) {
 
         return Fields.fields(Arrays.stream(BeanUtils.getPropertyDescriptors(type))
                 .filter(it -> {
@@ -291,6 +347,11 @@ final class DataTablesCriteria<T> {
                     if (ReflectionUtils.isObjectMethod(method)) {
                         return false;
                     }
+
+                    if (excludedColumns.contains(it.getName())) {
+                        return false;
+                    }
+
                     return !method.isDefault();
                 })
                 .map(PropertyDescriptor::getName)

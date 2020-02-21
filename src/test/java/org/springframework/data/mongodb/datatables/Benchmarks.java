@@ -96,7 +96,7 @@ public class Benchmarks extends BenchmarkRunner {
     private DataTablesInput getDefaultInput() {
         DataTablesInput input = new DataTablesInput();
         input.setColumns(asList(
-                createIntColumn("id", true, true),
+                createColumn("id", true, true),
                 createColumn("label", true, true),
                 createColumn("isEnabled", true, true),
                 createColumn("createdAt", true, true),
@@ -105,6 +105,12 @@ public class Benchmarks extends BenchmarkRunner {
                 createColumn("product", false, false)
         ));
         input.setSearch(new DataTablesInput.Search("", false));
+
+        DataTablesInput.SearchConfiguration searchConfiguration = new DataTablesInput.SearchConfiguration();
+        input.setSearchConfiguration(searchConfiguration);
+
+        searchConfiguration.setSearchType("id", DataTablesInput.SearchType.Integer);
+
         return input;
     }
 
@@ -116,15 +122,23 @@ public class Benchmarks extends BenchmarkRunner {
         productRefColumns.add("isEnabled");
 
         input.setColumns(asList(
-                createIntColumn("id", true, true),
+                createColumn("id", true, true),
                 createColumn("label", true, true),
-                createBooleanColumn("isEnabled", true, true),
+                createColumn("isEnabled", true, true),
                 createColumn("createdAt", true, true),
                 createColumn("characteristics.key", true, true),
                 createColumn("characteristics.value", true, true),
-                createRefColumn("product", false, false, "product", productRefColumns)
+                createColumn("product", false, false)
         ));
         input.setSearch(new DataTablesInput.Search("", false));
+
+        DataTablesInput.SearchConfiguration searchConfiguration = new DataTablesInput.SearchConfiguration();
+        input.setSearchConfiguration(searchConfiguration);
+
+        searchConfiguration.setSearchType("id", DataTablesInput.SearchType.Integer);
+        searchConfiguration.setSearchType("isEnabled", DataTablesInput.SearchType.Boolean);
+
+        searchConfiguration.addRefConfiguration("product", "product", productRefColumns, "createdAt");
         return input;
     }
 
@@ -134,30 +148,6 @@ public class Benchmarks extends BenchmarkRunner {
         column.setOrderable(orderable);
         column.setSearchable(searchable);
         column.setSearch(new DataTablesInput.Search("", true));
-        return column;
-    }
-
-    private DataTablesInput.Column createRefColumn(String columnName, boolean orderable, boolean searchable, String refCollection,  List<String> refColumns) {
-        DataTablesInput.Column column = new DataTablesInput.Column();
-        column.setData(columnName);
-        column.setOrderable(orderable);
-        column.setSearchable(searchable);
-        column.setReference(true);
-        column.setReferenceCollection(refCollection);
-        column.setReferenceColumns(refColumns);
-        column.setSearch(new DataTablesInput.Search("", true));
-        return column;
-    }
-
-    private DataTablesInput.Column createBooleanColumn(String columnName, boolean orderable, boolean searchable) {
-        DataTablesInput.Column column = createColumn(columnName, orderable, searchable);
-        column.setSearchType(DataTablesInput.Column.SearchType.Boolean);
-        return column;
-    }
-
-    private DataTablesInput.Column createIntColumn(String columnName, boolean orderable, boolean searchable) {
-        DataTablesInput.Column column = createColumn(columnName, orderable, searchable);
-        column.setSearchType(DataTablesInput.Column.SearchType.Integer);
         return column;
     }
 }

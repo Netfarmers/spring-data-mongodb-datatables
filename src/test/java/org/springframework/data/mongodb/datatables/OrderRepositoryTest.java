@@ -1,12 +1,9 @@
 package org.springframework.data.mongodb.datatables;
 
 import org.junit.Before;
-import org.junit.Ignore;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.data.mongodb.core.MongoOperations;
-import org.springframework.data.mongodb.core.aggregation.*;
 import org.springframework.data.mongodb.core.query.Criteria;
 import org.springframework.test.context.ContextConfiguration;
 import org.springframework.test.context.junit4.SpringJUnit4ClassRunner;
@@ -83,7 +80,9 @@ public class OrderRepositoryTest {
                 createColumn("characteristics.key", true, true),
                 createColumn("characteristics.value", true, true),
                 createColumn("product", true, true),
-                createColumn("user", true, true)
+                createColumn("user", true, true),
+                createColumn("lastModified", true, true),
+                createColumn("lastProcessed", true, true)
         )));
         input.setSearch(new DataTablesInput.Search("", false));
 
@@ -92,6 +91,8 @@ public class OrderRepositoryTest {
 
         searchConfiguration.setSearchType("id", DataTablesInput.SearchType.Integer);
         searchConfiguration.setSearchType("isEnabled", DataTablesInput.SearchType.Boolean);
+        searchConfiguration.setSearchType("lastModified", DataTablesInput.SearchType.Date);
+        searchConfiguration.setSearchType("lastProcessed", DataTablesInput.SearchType.Date);
 
         searchConfiguration.addRefConfiguration("product", "product", productRefColumns, "createdAt");
         searchConfiguration.addRefConfiguration("user", "user", userRefColumns, "firstName");
@@ -262,6 +263,58 @@ public class OrderRepositoryTest {
         DataTablesOutput<Order> output = orderRepository.findAll(input);
         assertThat(output.getData()).containsOnly(order1, order2);
         assertThat(output.getError()).isNull();
+    }
+
+    @Test
+    public void columnFilterDate() {
+        DataTablesInput input = getDefaultInput();
+        input.getColumn("lastModified").ifPresent(column -> column.setSearch(new DataTablesInput.Search("1970", false)));
+
+        DataTablesOutput<Order> output = orderRepository.findAll(input);
+        assertThat(output.getError()).isNull();
+        assertThat(output.getData()).containsOnly(order2);
+    }
+
+    @Test
+    public void columnFilterDateMultipleResults() {
+        DataTablesInput input = getDefaultInput();
+        input.getColumn("lastModified").ifPresent(column -> column.setSearch(new DataTablesInput.Search("197", false)));
+
+        DataTablesOutput<Order> output = orderRepository.findAll(input);
+        assertThat(output.getError()).isNull();
+        assertThat(output.getData()).containsOnly(order1,order2);
+    }
+
+    @Test
+    public void columnFilterDateMultipleFields() {
+        DataTablesInput input = getDefaultInput();
+        input.getColumn("lastProcessed").ifPresent(column -> column.setSearch(new DataTablesInput.Search("1980", false)));
+
+        DataTablesOutput<Order> output = orderRepository.findAll(input);
+        assertThat(output.getError()).isNull();
+        assertThat(output.getData()).containsOnly(order2);
+    }
+
+    @Test
+    public void columnFilterDateMultipleFieldsRegex() {
+        DataTablesInput input = getDefaultInput();
+        input.getColumn("lastProcessed").ifPresent(column -> column.setSearch(new DataTablesInput.Search("1980", true)));
+
+        DataTablesOutput<Order> output = orderRepository.findAll(input);
+        assertThat(output.getError()).isNull();
+        assertThat(output.getData()).containsOnly(order2);
+    }
+
+    @Test
+    public void columnFilterByTime() {
+        DataTablesInput input = getDefaultInput();
+        DataTablesInput.SearchConfiguration.ColumnSearchConfiguration.DEFAULT.setTimezone("Europe/Berlin");
+        //Object has 3:00 UTC and should match with another timezone
+        input.getColumn("lastModified").ifPresent(column -> column.setSearch(new DataTablesInput.Search("05:00", false)));
+
+        DataTablesOutput<Order> output = orderRepository.findAll(input);
+        assertThat(output.getError()).isNull();
+        assertThat(output.getData()).containsOnly(order1);
     }
 
     @Test

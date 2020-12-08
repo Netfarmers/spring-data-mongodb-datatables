@@ -7,6 +7,7 @@ import org.springframework.data.annotation.Id;
 import org.springframework.data.mongodb.core.mapping.DBRef;
 import org.springframework.data.mongodb.core.mapping.Document;
 
+import java.time.Instant;
 import java.time.LocalDateTime;
 import java.time.temporal.ChronoUnit;
 import java.util.List;
@@ -22,6 +23,7 @@ public class Order {
                 .label("order1")
                 .isEnabled(true)
                 .createdAt(truncateToMillis(LocalDateTime.now()))
+                .lastModified(Instant.parse("1971-01-01T04:00:00.00Z"))
                 .product(product)
                 .characteristic(new Product.Characteristic("key1", "val11"))
                 .characteristic(new Product.Characteristic("key2", "val21"))
@@ -34,6 +36,8 @@ public class Order {
                 .label("order2")
                 .isEnabled(true)
                 .createdAt(truncateToMillis(LocalDateTime.now().plusHours(1)))
+                .lastModified(Instant.parse("1970-01-01T03:00:00.00Z"))
+                .lastProcessed(Instant.parse("1980-01-01T03:00:00.00Z"))
                 .product(product)
                 .characteristic(new Product.Characteristic("key1", "val12"))
                 .build();
@@ -90,4 +94,7 @@ public class Order {
 
     @DBRef
     private User user;
+
+    private Instant lastModified;
+    private Instant lastProcessed;
 }

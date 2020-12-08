@@ -3,14 +3,27 @@ package org.springframework.data.mongodb.datatables;
 import org.springframework.beans.BeanUtils;
 import org.springframework.data.annotation.Id;
 import org.springframework.data.domain.Sort;
-import org.springframework.data.mongodb.core.aggregation.*;
+import org.springframework.data.mongodb.core.aggregation.Aggregation;
+import org.springframework.data.mongodb.core.aggregation.AggregationOperation;
+import org.springframework.data.mongodb.core.aggregation.DateOperators;
+import org.springframework.data.mongodb.core.aggregation.Fields;
+import org.springframework.data.mongodb.core.aggregation.LookupOperation;
+import org.springframework.data.mongodb.core.aggregation.MatchOperation;
+import org.springframework.data.mongodb.core.aggregation.ObjectOperators;
+import org.springframework.data.mongodb.core.aggregation.ProjectionOperation;
 import org.springframework.data.mongodb.core.query.Criteria;
 import org.springframework.util.ReflectionUtils;
 import org.springframework.util.StringUtils;
 
 import java.beans.PropertyDescriptor;
 import java.lang.reflect.Method;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collection;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
 
 import static java.util.stream.Collectors.toList;
 import static org.springframework.data.domain.Sort.by;
@@ -28,6 +41,7 @@ final class DataTablesCriteria<T> {
 
     private Map<String, DataTablesInput.SearchConfiguration.ColumnSearchConfiguration> columnSearchConfiguration;
     private List<String> excludedColumns;
+    private List<String> dateProjectionColumns = new ArrayList<>();
 
     DataTablesCriteria(DataTablesInput input, Criteria additionalCriteria, Criteria preFilteringCriteria, Class<T> classType) {
         if (input.getSearchConfiguration() != null) {
@@ -69,9 +83,9 @@ final class DataTablesCriteria<T> {
         // If there is not projection because of references but there are excluded columns,
         // an extra projection has to be added to exclude these columns
         if (!columnSearchConfiguration.isEmpty()) {
+            aggregationOperations.addAll(addDateResolver(input));
             List<AggregationOperation> referenceResolverOps = addReferenceResolver(input);
             aggregationOperations.addAll(referenceResolverOps);
-
             if (referenceResolverOps.isEmpty() && !excludedColumns.isEmpty()) {
                 aggregationOperations.add(createFieldProjection(input));
             }
@@ -117,7 +131,11 @@ final class DataTablesCriteria<T> {
                 .distinct()
                 .collect(toList());
 
-        for (DataTablesInput.Column c: input.getColumns()) {
+        //needs to be included in following projections otherwise the result
+        //of date projection are getting lost during the aggregation processing
+        columnStrings.addAll(dateProjectionColumns);
+
+        for (DataTablesInput.Column c : input.getColumns()) {
 
             DataTablesInput.SearchConfiguration.ColumnSearchConfiguration searchConfig = columnSearchConfiguration.get(c.getData());
 
@@ -140,7 +158,7 @@ final class DataTablesCriteria<T> {
                 ProjectionOperation projectDbRefObject = Aggregation
                         .project(allClassFields)
                         .andInclude(columnStringsArr)
-                        .and( resolvedReferenceColumn + "_fk_arr").arrayElementAt(1)
+                        .and(resolvedReferenceColumn + "_fk_arr").arrayElementAt(1)
                         .as(resolvedReferenceColumn + "_fk_obj");
 
                 // Get value field from key-value object
@@ -160,6 +178,46 @@ final class DataTablesCriteria<T> {
                 aggregations.add(projectDbRefObject);
                 aggregations.add(projectPidField);
                 aggregations.add(lookupOperation);
+            }
+        }
+
+        return aggregations;
+    }
+
+    private List<AggregationOperation> addDateResolver(DataTablesInput input) {
+
+        List<AggregationOperation> aggregations = new ArrayList<>();
+        List<String> columnStrings = input.getColumns().stream()
+                .map(column -> column.getData().contains(".") ? column.getData().substring(0, column.getData().indexOf(".")) : column.getData())
+                .distinct()
+                .collect(toList());
+        for (DataTablesInput.Column c : input.getColumns()) {
+            String[] columnStringsArr = columnStrings.toArray(new String[0]);
+
+            DataTablesInput.SearchConfiguration.ColumnSearchConfiguration searchConfig = columnSearchConfiguration.get(c.getData());
+
+            if (searchConfig != null && searchConfig.getSearchType().equals(DataTablesInput.SearchType.Date) && (c.isSearchable() || c.isOrderable())) {
+                String projectionColumnName = c.getData() + "TimeString";
+                ProjectionOperation projectDateToString;
+                // Convert date field to date formatted string
+                if (DataTablesInput.SearchConfiguration.ColumnSearchConfiguration.DEFAULT.getTimezone() != null
+                        && !DataTablesInput.SearchConfiguration.ColumnSearchConfiguration.DEFAULT.getTimezone().isEmpty()) {
+                    projectDateToString = Aggregation
+                            .project(allClassFields)
+                            .andInclude(columnStringsArr)
+                            .and(DateOperators.dateOf(c.getData()).toString("%d.%m.%Y, %H:%M").withTimezone(DateOperators.Timezone.valueOf(DataTablesInput.SearchConfiguration.ColumnSearchConfiguration.DEFAULT.getTimezone())))
+                            .as(projectionColumnName);
+                } else {
+                    projectDateToString = Aggregation
+                            .project(allClassFields)
+                            .andInclude(columnStringsArr)
+                            .and(DateOperators.dateOf(c.getData()).toString("%d.%m.%Y, %H:%M"))
+                            .as(projectionColumnName);
+                }
+
+                dateProjectionColumns.add(projectionColumnName);
+                columnStrings.add(projectionColumnName);
+                aggregations.add(projectDateToString);
             }
         }
 
@@ -234,6 +292,14 @@ final class DataTablesCriteria<T> {
                         criteria.add(where(column.getData()).is(intSearchValue));
                     } catch (NumberFormatException e) {
                         return criteria;
+                    }
+                    break;
+                case Date:
+                    String columnName = column.getData() + "TimeString";
+                    if (search.isRegex()) {
+                        criteria.add(where(columnName).regex(searchValue));
+                    } else {
+                        criteria.add(where(columnName).regex(searchValue.trim(), "i"));
                     }
                     break;
                 default:
@@ -327,13 +393,14 @@ final class DataTablesCriteria<T> {
                 .map(column -> column.getData().contains(".") ? column.getData().substring(0, column.getData().indexOf(".")) : column.getData())
                 .distinct()
                 .collect(toList());
-
+        columnStrings.addAll(dateProjectionColumns);
         return Aggregation.project(allClassFields).andInclude(columnStrings.toArray(new String[0]));
     }
 
     /**
      * Use official getFields method to list all fields of the class.
      * Source: https://github.com/spring-projects/spring-data-mongodb/blob/1a5de2e1db939f7b35579f11815894fd637fc227/spring-data-mongodb/src/main/java/org/springframework/data/mongodb/core/aggregation/AggregationOperationContext.java#L88
+     *
      * @return Class fields
      */
     private Fields getFields(Class<T> type, List<String> excludedColumns) {

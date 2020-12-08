@@ -141,7 +141,8 @@ public class DataTablesInput {
             this.regex = regex;
         }
 
-        Search() {}
+        Search() {
+        }
     }
 
     @Data
@@ -166,7 +167,8 @@ public class DataTablesInput {
             this.dir = dir;
         }
 
-        Order() {}
+        Order() {
+        }
 
         public enum Direction {
             desc, asc
@@ -236,12 +238,26 @@ public class DataTablesInput {
              * Sets how the column should be searched. E.g., if values should be parsed to integer and compared as integer. Set it to SearchType.Integer.
              */
             private SearchType searchType = SearchType.String;
+
+            /**
+             * Attribute is used for date columns and allows for the following options and expressions:
+             *
+             * <ul>
+             *     <li>an Olson Timezone Identifier, such as "Europe/Berlin" or "America/New_York"<li>
+             *     <li>a UTC offset in the form: +/-[hh]:[mm], e.g. "+04:45" or "-03:10"</li>
+             *     <li>thhe strings “Z”, “UTC”, or “GMT”</li>
+             * </ul>
+             *
+             * If this value is null the UTC will be used
+             */
+            private String timezone;
         }
     }
 
     public enum SearchType {
         String,
         Boolean,
-        Integer
+        Integer,
+        Date
     }
 }

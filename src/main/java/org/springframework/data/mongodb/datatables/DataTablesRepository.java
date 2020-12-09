@@ -43,6 +43,7 @@ public interface DataTablesRepository<T, ID extends Serializable> extends MongoR
      *
      * @param input     the {@link DataTablesInput} mapped from the Ajax request
      * @param converter the {@link Function} to apply to the results of the query
+     * @param <R>       the Return entity type
      * @return a {@link DataTablesOutput}
      */
     <R> DataTablesOutput<R> findAll(DataTablesInput input, Function<T, R> converter);
@@ -54,6 +55,7 @@ public interface DataTablesRepository<T, ID extends Serializable> extends MongoR
      * @param additionalCriteria   an additional {@link Criteria} to apply to the query (with an "AND" clause)
      * @param preFilteringCriteria a pre-filtering {@link Criteria} to apply to the query (with an "AND" clause)
      * @param converter            the {@link Function} to apply to the results of the query
+     * @param <R>       the Return entity type
      * @return a {@link DataTablesOutput}
      */
     <R> DataTablesOutput<R> findAll(DataTablesInput input, Criteria additionalCriteria,

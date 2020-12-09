@@ -245,7 +245,7 @@ public class DataTablesInput {
              * <ul>
              *     <li>an Olson Timezone Identifier, such as "Europe/Berlin" or "America/New_York"<li>
              *     <li>a UTC offset in the form: +/-[hh]:[mm], e.g. "+04:45" or "-03:10"</li>
-             *     <li>thhe strings “Z”, “UTC”, or “GMT”</li>
+             *     <li>the strings "Z", "UTC", or "GMT"</li>
              * </ul>
              *
              * If this value is null the UTC will be used
